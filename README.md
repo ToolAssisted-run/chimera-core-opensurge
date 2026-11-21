@@ -8,6 +8,13 @@ engine, as a project, with movies and TAStudio like any other core.
 The core is one file, `opensurge.chimeraCore`. Put it in Chimera's `Cores`
 folder.
 
+**Speed, plainly:** the game does not play in real time in Chimera's window.
+The picture is drawn by a software OpenGL (Mesa's softpipe), and one drawn
+frame costs about 0.37 seconds of CPU. In Chimera's window that was measured
+at about 1.4 frames a second on a busy build machine. Frames that are not
+shown (seeking, fast forward, `chimera-run`) cost a few milliseconds each.
+Drawing on the graphics card is later work. Details are in "Speed" below.
+
 ## What it is
 
 - The engine is upstream's C code, built from source with a few patches
@@ -45,7 +52,8 @@ looks at is not drawn at all and costs a few milliseconds: 3000 steps of a run
 through the first level, every 50th drawn, take about half a minute. Seeking,
 fast forward, `chimera-run` and the tests draw only the steps that are
 looked at. The numbers, and how they were measured, are in
-[docs/PLAN.md](docs/PLAN.md). Playing in real time is not possible.
+[docs/PLAN.md](docs/PLAN.md). Playing in real time is not possible until the
+picture is drawn on the graphics card, which is later work.
 
 ## Building
 

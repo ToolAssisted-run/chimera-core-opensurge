@@ -207,12 +207,17 @@ musl, so both are the core's own.
 - **A gamepad.** The default bindings are checked to be the ones Chimera adopts;
   no pad was connected.
 - **Real time.** Drawing is slow (above): the core does not play in real time.
+  A drawn frame costs about 0.37 s of CPU because Mesa's softpipe (a software
+  OpenGL) draws it; frames that are not shown cost a few milliseconds. Drawing
+  on the graphics card is later work.
   Chimera's own window draws every step it shows (about 0.7 seconds a step in
   the test), so the window test plays 120 steps.
 - **The menus.** The route starts in the first level (the startLevel setting).
   The intro and the title screen run (the first 400 steps are in the tests, not
   a route through the menus).
-- **Translations.** The 25 language tables other than English are English
-  copies.
+- **Translations.** The 25 language tables other than English are
+  translated, key for key, with every placeholder kept. They were written by an
+  AI model and have not yet been read by native speakers; a speaker is welcome
+  to look them over.
 - **The mouse and the touch screen.** The engine's mouse is installed and never
   moves; touch is not there. The game's menus need neither.
