@@ -1,0 +1,58 @@
+diff --git a/src/scenes/settings.c b/src/scenes/settings.c
+index 353d46b3..1be7ac6b 100644
+--- a/src/scenes/settings.c
++++ b/src/scenes/settings.c
+@@ -1535,14 +1535,10 @@ void enter_playgame(settings_entry_t* e)
+ 
+     /* create and start a new thread
+        only one file chooser must be active at any given time */
+-    if(f->thread != NULL)
+-        al_destroy_thread(f->thread); /* blocking */
+-    f->thread = al_create_thread(filechooser_run, f);
+-    al_start_thread(f->thread);
++    /* Chimera: no thread; the dialog is not there, and says so */
++    filechooser_run(NULL, f);
+ 
+ #if !defined(__ANDROID__)
+-    /* wait for the file chooser */
+-    al_join_thread(f->thread, NULL);
+ #else
+     /* Android: need to handle ALLEGRO_EVENT_DISPLAY_HALT_DRAWING
+        before the blocking call to the file chooser returns
+diff --git a/src/scripting/loaderthread.c b/src/scripting/loaderthread.c
+index 6e43fc49..1ee1f7f2 100644
+--- a/src/scripting/loaderthread.c
++++ b/src/scripting/loaderthread.c
+@@ -60,10 +60,10 @@ ALLEGRO_THREAD* surgescriptloaderthread_create(int argc, const char** argv)
+             ctx->argv[i] = str_dup(argv[i]);
+     }
+ 
+-    /* create & start thread */
+-    ALLEGRO_THREAD* thread = al_create_thread(load_surgescript, ctx);
+-    al_start_thread(thread);
+-    return thread;
++    /* Chimera: there are no threads: the scripts are compiled here, and the
++       "thread" is the context, which _destroy() takes */
++    load_surgescript(NULL, ctx);
++    return (ALLEGRO_THREAD*)ctx;
+ }
+ 
+ /*
+@@ -75,15 +75,10 @@ ALLEGRO_THREAD* surgescriptloaderthread_destroy(ALLEGRO_THREAD* thread)
+ {
+     ssthreadcontext_t* ctx = NULL;
+ 
+-    /* wait for completion */
+-    void* ret = NULL;
+-    al_join_thread(thread, &ret);
+-    ctx = (ssthreadcontext_t*)ret;
++    /* already done (see _create()) */
++    ctx = (ssthreadcontext_t*)thread;
+     assertx(ctx != NULL);
+ 
+-    /* release thread */
+-    al_destroy_thread(thread);
+-
+     /* error checking */
+     if(ctx->error_message[0] != '\0') {
+         /* fatal_error() must be called in the main thread

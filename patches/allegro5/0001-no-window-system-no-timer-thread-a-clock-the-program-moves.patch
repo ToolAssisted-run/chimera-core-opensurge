@@ -1,0 +1,67 @@
+diff --git a/cmake/FileList.cmake b/cmake/FileList.cmake
+index beed6cafd..120239754 100644
+--- a/cmake/FileList.cmake
++++ b/cmake/FileList.cmake
+@@ -103,6 +103,7 @@ set(ALLEGRO_SRC_WGL_FILES
+ 
+ set(ALLEGRO_SRC_UNIX_FILES
+     src/unix/udrvlist.c
++    ${CHIMERA_OSMESA_DRIVER}
+     src/unix/ufdwatch.c
+     src/unix/ugfxdrv.c
+     src/unix/uhapdrv.c
+diff --git a/src/opengl/extensions.c b/src/opengl/extensions.c
+index e8ec7139e..3e0953479 100644
+--- a/src/opengl/extensions.c
++++ b/src/opengl/extensions.c
+@@ -44,6 +44,11 @@
+ 
+ ALLEGRO_DEBUG_CHANNEL("opengl")
+ 
++#if defined ALLEGRO_UNIX && defined ALLEGRO_EXCLUDE_GLX
++/* Built without GLX: the driver (src/osmesa) provides the loader. */
++void *glXGetProcAddress(const unsigned char *name);
++#endif
++
+ 
+ #ifdef ALLEGRO_HAVE_DYNAMIC_LINK
+    #include <dlfcn.h>
+diff --git a/src/timernu.c b/src/timernu.c
+index b78898f27..7fb34d7ab 100644
+--- a/src/timernu.c
++++ b/src/timernu.c
+@@ -58,6 +58,7 @@ static _AL_VECTOR active_timers = _AL_VECTOR_INITIALIZER(ALLEGRO_TIMER *);
+ static _AL_THREAD * volatile timer_thread = NULL;
+ static ALLEGRO_COND *timer_cond = NULL;
+ static bool destroy_thread = false;
++bool _al_timer_manual = true;
+ 
+ 
+ /* timer_thread_proc: [timer thread]
+@@ -194,7 +195,8 @@ static void enable_timer(ALLEGRO_TIMER *timer, bool reset_counter)
+       }
+       al_unlock_mutex(timers_mutex);
+ 
+-      if (timer_thread == NULL) {
++      /* osmesa driver: no timer thread, the program calls al_osmesa_advance_time */
++      if (timer_thread == NULL && !_al_timer_manual) {
+          destroy_thread = false;
+          timer_thread = al_malloc(sizeof(_AL_THREAD));
+          _al_thread_create(timer_thread, timer_thread_proc, NULL);
+diff --git a/src/unix/udrvlist.c b/src/unix/udrvlist.c
+index 75d03cbe1..ed1d97c59 100644
+--- a/src/unix/udrvlist.c
++++ b/src/unix/udrvlist.c
+@@ -33,9 +33,12 @@
+ /* This is a function each platform must define to register all available
+  * system drivers.
+  */
++ALLEGRO_SYSTEM_INTERFACE *_al_system_osmesa_driver(void);
+ void _al_register_system_interfaces(void)
+ {
+    ALLEGRO_SYSTEM_INTERFACE **add;
++   add = _al_vector_alloc_back(&_al_system_interfaces);
++   *add = _al_system_osmesa_driver();
+ #if defined ALLEGRO_WITH_XWINDOWS && !defined ALLEGRO_RASPBERRYPI
+    add = _al_vector_alloc_back(&_al_system_interfaces);
+    *add = _al_system_xglx_driver();

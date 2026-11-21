@@ -1,0 +1,176 @@
+{
+  "package": "opensurge",
+  "effectiveTerms": "GPL-3.0-or-later for the engine, SurgeScript's runtime (Apache-2.0, compatible) and this core's integration; each game file under its own licence, listed with its author",
+  "commercialUse": "allowed (the engine is GPL-3.0; the game files are CC-BY, CC-BY-SA, CC0, MIT, Apache-2.0, OFL-1.1 and Giftware: each asks that its author is credited, and the CC-BY-SA files that a changed copy of them is shared on the same terms)",
+  "note": "The built core is the Open Surge Engine compiled with the patches in patches/ (a modified copy of its source: the corresponding source is this repository at the commit the package names, and the commits its submodules pin), on Allegro 5 with drivers of this core's own in place of a window system, SurgeScript, PhysicsFS, FreeType, libpng, zlib, libogg and libvorbis, and with Mesa's softpipe OpenGL. The package carries Surge the Rabbit's game files (the engine's own sample game: its pictures, sound effects, music, fonts, levels and scripts) as one zip inside the program. Each is credited in the engine's credits screen and in src/misc/copyright_data.csv (the last licence text of the package), which names the author and the licence of every file; the licence texts are in licenses/. The CC-BY-SA files (ten music tracks, and two pictures) are shipped unchanged, beside the program and not in it: their share-alike terms are theirs only.",
+  "components": [
+    {
+      "name": "chimera-core-opensurge (integration)",
+      "license": "GPL-3.0-or-later",
+      "url": "https://github.com/ToolAssisted-run/chimera-core-opensurge",
+      "commit": "{selfCommit}",
+      "file": "LICENSE",
+      "sourceUrl": "https://github.com/ToolAssisted-run/chimera-core-opensurge/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "Open Surge Engine",
+      "license": "GPL-3.0-or-later",
+      "url": "https://github.com/alemart/opensurge",
+      "commit": "{submodule:extern/opensurge}",
+      "file": "extern/opensurge/LICENSE",
+      "sourceUrl": "https://github.com/alemart/opensurge/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "SurgeScript",
+      "license": "Apache-2.0",
+      "url": "https://github.com/alemart/surgescript",
+      "commit": "{submodule:extern/surgescript}",
+      "file": "extern/surgescript/LICENSE",
+      "sourceUrl": "https://github.com/alemart/surgescript/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "Allegro 5",
+      "license": "Zlib-style (the Allegro licence; Giftware for its older parts)",
+      "url": "https://github.com/liballeg/allegro5",
+      "commit": "{submodule:extern/allegro5}",
+      "file": "extern/allegro5/LICENSE.txt",
+      "sourceUrl": "https://github.com/liballeg/allegro5/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "PhysicsFS",
+      "license": "Zlib",
+      "url": "https://github.com/icculus/physfs",
+      "commit": "{submodule:extern/physfs}",
+      "file": "extern/physfs/LICENSE.txt",
+      "sourceUrl": "https://github.com/icculus/physfs/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "FreeType",
+      "license": "FTL (FreeType Project License)",
+      "url": "https://github.com/freetype/freetype",
+      "commit": "{submodule:extern/freetype}",
+      "file": "extern/freetype/docs/FTL.TXT",
+      "sourceUrl": "https://github.com/freetype/freetype/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "libpng",
+      "license": "libpng-2.0",
+      "url": "https://github.com/pnggroup/libpng",
+      "commit": "{submodule:extern/libpng}",
+      "file": "extern/libpng/LICENSE",
+      "sourceUrl": "https://github.com/pnggroup/libpng/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "zlib",
+      "license": "Zlib",
+      "url": "https://github.com/madler/zlib",
+      "commit": "{submodule:extern/zlib}",
+      "file": "extern/zlib/LICENSE",
+      "sourceUrl": "https://github.com/madler/zlib/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "libogg",
+      "license": "BSD-3-Clause",
+      "url": "https://github.com/xiph/ogg",
+      "commit": "{submodule:extern/ogg}",
+      "file": "extern/ogg/COPYING",
+      "sourceUrl": "https://github.com/xiph/ogg/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "libvorbis",
+      "license": "BSD-3-Clause",
+      "url": "https://github.com/xiph/vorbis",
+      "commit": "{submodule:extern/vorbis}",
+      "file": "extern/vorbis/COPYING",
+      "sourceUrl": "https://github.com/xiph/vorbis/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "Mesa (softpipe behind OSMesa)",
+      "license": "MIT",
+      "url": "https://www.mesa3d.org/",
+      "commit": "24.0.9",
+      "file": "build/mesa/docs/license.rst",
+      "sourceUrl": "https://archive.mesa3d.org/mesa-24.0.9.tar.xz"
+    },
+    {
+      "name": "Surge the Rabbit's game files under CC-BY-3.0",
+      "license": "CC-BY-3.0",
+      "url": "https://github.com/alemart/opensurge",
+      "commit": "{submodule:extern/opensurge}",
+      "file": "extern/opensurge/licenses/CC-BY-3.0-legalcode.txt",
+      "sourceUrl": "https://github.com/alemart/opensurge/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "Surge the Rabbit's game files under CC-BY-4.0",
+      "license": "CC-BY-4.0",
+      "url": "https://github.com/alemart/opensurge",
+      "commit": "{submodule:extern/opensurge}",
+      "file": "extern/opensurge/licenses/CC-BY-4.0-legalcode.txt",
+      "sourceUrl": "https://github.com/alemart/opensurge/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "Surge the Rabbit's game files under CC-BY-SA-3.0",
+      "license": "CC-BY-SA-3.0",
+      "url": "https://github.com/alemart/opensurge",
+      "commit": "{submodule:extern/opensurge}",
+      "file": "extern/opensurge/licenses/CC-BY-SA-3.0-legalcode.txt",
+      "sourceUrl": "https://github.com/alemart/opensurge/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "Surge the Rabbit's game files under CC-BY-SA-4.0",
+      "license": "CC-BY-SA-4.0",
+      "url": "https://github.com/alemart/opensurge",
+      "commit": "{submodule:extern/opensurge}",
+      "file": "extern/opensurge/licenses/CC-BY-SA-4.0-legalcode.txt",
+      "sourceUrl": "https://github.com/alemart/opensurge/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "Surge the Rabbit's game files under CC0-1.0",
+      "license": "CC0-1.0",
+      "url": "https://github.com/alemart/opensurge",
+      "commit": "{submodule:extern/opensurge}",
+      "file": "extern/opensurge/licenses/CC0-1.0-legalcode.txt",
+      "sourceUrl": "https://github.com/alemart/opensurge/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "Surge the Rabbit's game files under MIT",
+      "license": "MIT",
+      "url": "https://github.com/alemart/opensurge",
+      "commit": "{submodule:extern/opensurge}",
+      "file": "extern/opensurge/licenses/MIT-license.txt",
+      "sourceUrl": "https://github.com/alemart/opensurge/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "Surge the Rabbit's game files under Apache-2.0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/alemart/opensurge",
+      "commit": "{submodule:extern/opensurge}",
+      "file": "extern/opensurge/licenses/Apache2-license.txt",
+      "sourceUrl": "https://github.com/alemart/opensurge/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "Surge the Rabbit's game files under OFL-1.1",
+      "license": "OFL-1.1",
+      "url": "https://github.com/alemart/opensurge",
+      "commit": "{submodule:extern/opensurge}",
+      "file": "extern/opensurge/licenses/OFL-1.1.txt",
+      "sourceUrl": "https://github.com/alemart/opensurge/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "Surge the Rabbit's game files under Giftware",
+      "license": "Giftware",
+      "url": "https://github.com/alemart/opensurge",
+      "commit": "{submodule:extern/opensurge}",
+      "file": "extern/opensurge/licenses/Giftware-license.txt",
+      "sourceUrl": "https://github.com/alemart/opensurge/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "Surge the Rabbit's game files: who made each and under which licence",
+      "license": "per file (CC-BY-3.0, CC-BY-4.0, CC-BY-SA-3.0, CC-BY-SA-4.0, CC0-1.0, MIT, Apache-2.0, OFL-1.1, Giftware)",
+      "url": "https://github.com/alemart/opensurge",
+      "commit": "{submodule:extern/opensurge}",
+      "file": "extern/opensurge/src/misc/copyright_data.csv",
+      "sourceUrl": "https://github.com/alemart/opensurge/archive/{commit}.tar.gz"
+    }
+  ]
+}

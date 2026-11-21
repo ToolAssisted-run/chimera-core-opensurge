@@ -1,0 +1,170 @@
+name: chimera waterbox core
+
+# The core as Chimera ships it: a sandboxed core.wbx package.
+#
+# Surge the Rabbit's files are part of the engine's own repository (a
+# submodule here) under licences that let the core carry them, so every test
+# runs on a public runner with nothing to download: the native reference and
+# the package build, fresh, from the pinned engine and libraries with the
+# patches applied; the core's tests (equivalence, rerecord, session, pictures,
+# undrawn steps, turbo, settings, a game of the project's own, saves,
+# refusals); the frontend tests (chimera-run and Chimera itself, headless);
+# and the package through Chimera's own contract tests. The core's OpenGL is
+# Mesa (waterbox/setup-mesa.sh), built for the guest and the host and cached
+# by the script's hash: the first run takes the long build, later ones none.
+#
+# The engine is the Open Surge Engine under the GPL-3.0; the game files are
+# under their authors' licences (LICENSE, package-licenses.json).
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+  schedule:
+    # 04:00 UTC. A nightly is published only when main moved since the last one;
+    # the reusable workflow checks, so an unchanged core costs one idle run.
+    - cron: '0 4 * * *'
+
+# Keyed by the EVENT as well as the ref: the nightly schedule and a push to
+# main would otherwise cancel each other, and the publish that depends on the
+# cancelled gate is then skipped with nothing reporting a failure.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+env:
+  CHIMERA_REF: main
+
+jobs:
+
+  gate:
+    name: gate (package, declaration, Chimera contract)
+    # Ubuntu 24.04, not ubuntu-latest: on GitHub's 26.04 image GCC builds for
+    # x86-64-v3 (AVX2, FMA) by default, so a core built there would not run
+    # on an older processor and would round floating point differently
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Check out Chimera
+        uses: actions/checkout@v6
+        with:
+          repository: ToolAssisted-run/chimera
+          ref: ${{ env.CHIMERA_REF }}
+          path: chimera-checkout
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends meson ninja-build build-essential cmake pkg-config python3 bison flex python3-mako python3-packaging libgl1-mesa-dev libegl-dev libx11-dev libxext-dev libasound2-dev python3-pip
+
+      - name: Cache Qt
+        uses: actions/cache@v4
+        with:
+          path: ~/qt
+          key: qt-6.12.0-linux-aqt-3.3.0
+
+      - name: Build Chimera (the engine, chimera-run and the window)
+        run: chimera-checkout/tools/ci-chimera.sh "$HOME/qt"
+
+      - name: Which Meson the runner has
+        # a build folder one Meson set up, another cannot read: the runner's
+        # Meson changed on 2026-11-12 and every cached miniBox build failed
+        id: meson
+        run: echo "version=$(meson --version)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the guest toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            chimera-checkout/extern/chimera-common-minibox/build/meson-linux
+            chimera-checkout/extern/chimera-common-minibox/build/meson-cpp
+          key: guest-cpp-meson${{ steps.meson.outputs.version }}-${{ runner.os }}-${{ hashFiles('chimera-checkout/extern/chimera-common-minibox/.git') }}-${{ hashFiles('chimera-checkout/extern/chimera-common-minibox/meson.build') }}
+
+      - name: Build miniBox (host + C++ guest toolchain)
+        run: |
+          mb="$PWD/chimera-checkout/extern/chimera-common-minibox"
+          [ -f "$mb/build/meson-linux/build.ninja" ] || meson setup "$mb/build/meson-linux" "$mb"
+          meson compile -C "$mb/build/meson-linux"
+          [ -f "$mb/build/meson-cpp/build.ninja" ] || meson setup "$mb/build/meson-cpp" "$mb" -Dguest_cpp=true
+          meson compile -C "$mb/build/meson-cpp"
+
+      - name: Cache Mesa (the core's OpenGL, both builds)
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/mesa
+            build/deps
+          key: mesa-24.0.9-${{ runner.os }}-${{ hashFiles('waterbox/setup-mesa.sh') }}-${{ hashFiles('chimera-checkout/extern/chimera-common-minibox/.git') }}
+
+      - name: Build Mesa
+        env:
+          MINIBOX_DIR: ${{ github.workspace }}/chimera-checkout/extern/chimera-common-minibox
+        run: |
+          bash waterbox/setup-mesa.sh -m "$MINIBOX_DIR"
+          bash waterbox/setup-mesa.sh -n
+
+      - name: Core tests
+        env:
+          MINIBOX_DIR: ${{ github.workspace }}/chimera-checkout/extern/chimera-common-minibox
+        run: ./waterbox/run-gate.sh
+
+      - name: Frontend tests
+        env:
+          MINIBOX_DIR: ${{ github.workspace }}/chimera-checkout/extern/chimera-common-minibox
+        run: ./waterbox/tests/run-frontend.sh --chimera-root "$GITHUB_WORKSPACE/chimera-checkout"
+
+      - name: Build and install the package
+        # The commit is the core's authoritative version: this build is the one
+        # that publishes the artifact, so what it stamps is what a movie can
+        # cite. A package built by hand stamps "+local" instead.
+        env:
+          CORE_VERSION: ${{ github.sha }}
+          MINIBOX_DIR: ${{ github.workspace }}/chimera-checkout/extern/chimera-common-minibox
+        run: ./waterbox/build-package.sh -r chimera-checkout
+
+      - name: The package through the real frontend
+        # Chimera's own contract tests, run against THIS package: readable,
+        # built for an ABI this frontend runs, a working factory, binding only
+        # buttons its controller declares, stamping a version.
+        env:
+          CHIMERA_CORES_DIR: ${{ github.workspace }}/chimera-checkout/build/Cores
+        run: chimera-checkout/build/meson-linux/source/ui/test-packages
+
+      - name: Publish the core package
+        uses: actions/upload-artifact@v7
+        with:
+          name: opensurge-${{ github.sha }}
+          path: chimera-checkout/build/Cores/opensurge.chimeraCore
+          if-no-files-found: error
+
+      - name: Upload the gate work dir on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gate-work
+          path: |
+            build/gate/
+            build/frontend/
+
+  publish:
+    # What the gate passed, published as this core's own release: an immutable
+    # `nightly-YYYY-MM-DD` from the scheduled run, or from one started by hand.
+    # A push to main publishes nothing. The logic is Chimera's tools/publish-
+    # core.sh, through the one reusable workflow every core publishes with.
+    name: publish
+    needs: [ gate ]
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+    uses: ToolAssisted-run/chimera/.github/workflows/publish-core.yml@main
+    with:
+      core-id: opensurge
+      artifact: opensurge-${{ github.sha }}
+      package: opensurge.chimeraCore

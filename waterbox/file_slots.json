@@ -1,0 +1,25 @@
+{
+  "_comment": "A project plays Surge the Rabbit, whose files are part of the core, unless it brings a game of its own: a zip of the game's folder (the folder with its surge.cfg). What the game writes - its preferences and its saves - stays in the machine; the saves of an earlier play go in as a zip of the user folder.",
+  "slots": [
+    {
+      "id": "game",
+      "title": "slot.game",
+      "min": 0,
+      "max": 1,
+      "formats": [
+        "zip"
+      ],
+      "help": "slot.game.help"
+    },
+    {
+      "id": "savedata",
+      "title": "slot.savedata",
+      "min": 0,
+      "max": -1,
+      "formats": [
+        "zip"
+      ],
+      "help": "slot.savedata.help"
+    }
+  ]
+}

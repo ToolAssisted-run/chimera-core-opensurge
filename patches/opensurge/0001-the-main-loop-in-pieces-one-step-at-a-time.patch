@@ -1,0 +1,89 @@
+diff --git a/src/core/engine.c b/src/core/engine.c
+index 5e69ac54..acd7f721 100644
+--- a/src/core/engine.c
++++ b/src/core/engine.c
+@@ -243,6 +243,70 @@ void engine_mainloop()
+     a5_handle_remaining_display_events();
+ }
+ 
++/*
++ * engine_mainloop_begin(), engine_step(), engine_mainloop_end()
++ * (Chimera) The game loop in pieces. The core makes time pass by hand
++ * (Allegro's timer is advanced by the program), so one step is: the
++ * events that are waiting - the keys, then the timer's tick - and a picture
++ * drawn when the tick has been handled and nothing else waits.
++ * engine_step() returns false when the game is over, as the loop ends.
++ */
++static bool step_can_draw = true;
++static bool step_is_ready_to_draw = false;
++
++void engine_mainloop_begin()
++{
++    step_can_draw = true;
++    step_is_ready_to_draw = false;
++
++    engine_add_event_listener(ALLEGRO_EVENT_DISPLAY_HALT_DRAWING, &step_can_draw, a5_handle_haltresume_event);
++    engine_add_event_listener(ALLEGRO_EVENT_DISPLAY_RESUME_DRAWING, &step_can_draw, a5_handle_haltresume_event);
++    engine_add_event_listener(ALLEGRO_EVENT_KEY_DOWN, NULL, a5_handle_hotkey);
++
++    if(NULL == (a5_timer = al_create_timer(1.0 / TARGET_FPS)))
++        fatal_error("Can't create an Allegro timer");
++
++    engine_add_event_source(al_get_timer_event_source(a5_timer));
++    engine_add_event_listener(ALLEGRO_EVENT_TIMER, &step_is_ready_to_draw, a5_handle_timer_event);
++    al_start_timer(a5_timer);
++}
++
++bool engine_step()
++{
++    ALLEGRO_EVENT event;
++
++    while(al_get_next_event(a5_event_queue, &event)) {
++        if(wants_to_quit || wants_to_restart || scenestack_empty())
++            return false;
++
++        const scene_t* scene = scenestack_top();
++        call_event_listeners(&event);
++
++        /* skip rendering if the scene changed */
++        scene_t* current_scene = scenestack_top();
++        if(current_scene != scene)
++            continue;
++
++        /* render */
++        if(step_can_draw && step_is_ready_to_draw && al_is_event_queue_empty(a5_event_queue)) {
++            current_scene->render();
++            fadefx_update();
++            video_render(render_overlay);
++            screenshot_update();
++            step_is_ready_to_draw = false;
++        }
++    }
++
++    return !(wants_to_quit || wants_to_restart || scenestack_empty());
++}
++
++void engine_mainloop_end()
++{
++    al_stop_timer(a5_timer);
++    al_destroy_timer(a5_timer);
++    a5_handle_remaining_display_events();
++}
++
+ /*
+  * engine_quit()
+  * Quit the application
+diff --git a/src/core/engine.h b/src/core/engine.h
+index 6668ecd7..4a93ce04 100644
+--- a/src/core/engine.h
++++ b/src/core/engine.h
+@@ -29,6 +29,9 @@ struct commandline_t;
+ void engine_init(const struct commandline_t* cmd);
+ bool engine_is_init();
+ void engine_mainloop();
++void engine_mainloop_begin(); /* Chimera: the loop in pieces */
++bool engine_step();
++void engine_mainloop_end();
+ void engine_release();
+ 
+ void engine_quit();

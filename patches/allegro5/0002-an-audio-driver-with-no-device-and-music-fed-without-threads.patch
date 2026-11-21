@@ -1,0 +1,223 @@
+diff --git a/addons/acodec/helper.c b/addons/acodec/helper.c
+index 26194ca7d..7961472ab 100644
+--- a/addons/acodec/helper.c
++++ b/addons/acodec/helper.c
+@@ -5,32 +5,18 @@
+ #include "allegro5/internal/aintern_system.h"
+ #include "helper.h"
+ 
++void _al_kcm_feeder_start(ALLEGRO_AUDIO_STREAM *stream);
++void _al_kcm_feeder_stop(ALLEGRO_AUDIO_STREAM *stream);
++
+ void _al_acodec_start_feed_thread(ALLEGRO_AUDIO_STREAM *stream)
+ {
+-   stream->feed_thread = al_create_thread(_al_kcm_feed_stream, stream);
+-   stream->feed_thread_started_cond = al_create_cond();
+-   stream->feed_thread_started_mutex = al_create_mutex();
+-   al_start_thread(stream->feed_thread);
++   /* osmesa: no thread; the marker only says "there is a feeder to unload" */
++   stream->feed_thread = (ALLEGRO_THREAD *)stream;
++   _al_kcm_feeder_start(stream);
+ }
+ 
+ void _al_acodec_stop_feed_thread(ALLEGRO_AUDIO_STREAM *stream)
+ {
+-   ALLEGRO_EVENT quit_event;
+-
+-   /* Need to wait for the thread to start, otherwise the quit event may be
+-    * sent before the event source is registered with the queue. */
+-   al_lock_mutex(stream->feed_thread_started_mutex);
+-   while (!stream->feed_thread_started) {
+-      al_wait_cond(stream->feed_thread_started_cond, stream->feed_thread_started_mutex);
+-   }
+-   al_unlock_mutex(stream->feed_thread_started_mutex);
+-
+-   quit_event.type = _KCM_STREAM_FEEDER_QUIT_EVENT_TYPE;
+-   al_emit_user_event(al_get_audio_stream_event_source(stream), &quit_event, NULL);
+-   al_join_thread(stream->feed_thread, NULL);
+-   al_destroy_thread(stream->feed_thread);
+-   al_destroy_cond(stream->feed_thread_started_cond);
+-   al_destroy_mutex(stream->feed_thread_started_mutex);
+-
++   _al_kcm_feeder_stop(stream);
+    stream->feed_thread = NULL;
+ }
+diff --git a/addons/audio/CMakeLists.txt b/addons/audio/CMakeLists.txt
+index 89e8a9f61..cfeae4c00 100644
+--- a/addons/audio/CMakeLists.txt
++++ b/addons/audio/CMakeLists.txt
+@@ -18,6 +18,9 @@ set(AUDIO_SOURCES
+     recorder.c
+     )
+ 
++list(APPEND AUDIO_SOURCES ${CHIMERA_OSMESA_AUDIO})
++set(SUPPORT_AUDIO 1)
++
+ set(AUDIO_INCLUDE_FILES allegro5/allegro_audio.h)
+ 
+ set_our_header_properties(${AUDIO_INCLUDE_FILES})
+diff --git a/addons/audio/allegro5/internal/aintern_audio.h b/addons/audio/allegro5/internal/aintern_audio.h
+index b7fe5f461..fce537cf4 100644
+--- a/addons/audio/allegro5/internal/aintern_audio.h
++++ b/addons/audio/allegro5/internal/aintern_audio.h
+@@ -298,6 +298,8 @@ struct ALLEGRO_AUDIO_STREAM {
+                           */
+ 
+    ALLEGRO_THREAD        *feed_thread;
++   ALLEGRO_EVENT_QUEUE   *feed_queue;       /* osmesa: no thread, the driver pumps it */
++   bool                  feeder_finished_sent;
+    ALLEGRO_MUTEX         *feed_thread_started_mutex;
+    ALLEGRO_COND          *feed_thread_started_cond;
+    bool                  feed_thread_started;
+diff --git a/addons/audio/audio.c b/addons/audio/audio.c
+index 6a2a94a6a..dc1d22f71 100644
+--- a/addons/audio/audio.c
++++ b/addons/audio/audio.c
+@@ -25,6 +25,7 @@ void _al_set_error(int error, char* string)
+ 
+ ALLEGRO_AUDIO_DRIVER *_al_kcm_driver = NULL;
+ 
++extern struct ALLEGRO_AUDIO_DRIVER _al_kcm_osmesa_driver;
+ #if defined(ALLEGRO_CFG_KCM_OPENAL)
+    extern struct ALLEGRO_AUDIO_DRIVER _al_kcm_openal_driver;
+ #endif
+@@ -256,6 +257,11 @@ static bool do_install_audio(ALLEGRO_AUDIO_DRIVER_ENUM mode)
+ 
+    switch (mode) {
+       case ALLEGRO_AUDIO_DRIVER_AUTODETECT:
++         /* the only driver of this build: no sound device, no thread */
++         if (_al_kcm_osmesa_driver.open() == 0) {
++            _al_kcm_driver = &_al_kcm_osmesa_driver;
++            return true;
++         }
+ #if defined(ALLEGRO_SDL)
+          retVal = do_install_audio(ALLEGRO_AUDIO_DRIVER_SDL);
+          if (retVal)
+diff --git a/addons/audio/kcm_stream.c b/addons/audio/kcm_stream.c
+index b17a6670a..adeb701ee 100644
+--- a/addons/audio/kcm_stream.c
++++ b/addons/audio/kcm_stream.c
+@@ -929,3 +929,123 @@ bool al_set_audio_stream_channel_matrix(ALLEGRO_AUDIO_STREAM *stream, const floa
+ }
+ 
+ /* vim: set sts=3 sw=3 et: */
++
++
++/* osmesa: the feeding without a thread. A stream is registered when its
++ * codec starts feeding it; _al_kcm_pump_streams, called by the audio driver
++ * once a step, does what _al_kcm_feed_stream does in its thread: it reads
++ * the stream's events and fills the fragments they say are free. */
++void _al_kcm_feeder_start(ALLEGRO_AUDIO_STREAM *stream);
++void _al_kcm_feeder_stop(ALLEGRO_AUDIO_STREAM *stream);
++void _al_kcm_pump_streams(void);
++#define OSM_MAX_FEEDERS 64
++static ALLEGRO_AUDIO_STREAM *osm_feeders[OSM_MAX_FEEDERS];
++static int osm_feeder_count;
++
++static void osm_feed_event(ALLEGRO_AUDIO_STREAM *stream, ALLEGRO_EVENT *event)
++{
++   if (event->type == ALLEGRO_EVENT_AUDIO_STREAM_FRAGMENT && !stream->is_draining) {
++      unsigned long bytes;
++      unsigned long bytes_written;
++      ALLEGRO_MUTEX *stream_mutex;
++      char *fragment = al_get_audio_stream_fragment(stream);
++      if (!fragment)
++         return;
++
++      bytes = (stream->spl.spl_data.len) *
++            al_get_channel_count(stream->spl.spl_data.chan_conf) *
++            al_get_audio_depth_size(stream->spl.spl_data.depth);
++
++      stream_mutex = maybe_lock_mutex(stream->spl.mutex);
++      bytes_written = stream->feeder(stream, fragment, bytes);
++      maybe_unlock_mutex(stream_mutex);
++
++      if (stream->spl.loop == _ALLEGRO_PLAYMODE_STREAM_ONEDIR) {
++         while (bytes_written < bytes &&
++                  stream->spl.loop == _ALLEGRO_PLAYMODE_STREAM_ONEDIR) {
++            size_t bw;
++            al_rewind_audio_stream(stream);
++            stream_mutex = maybe_lock_mutex(stream->spl.mutex);
++            bw = stream->feeder(stream, fragment + bytes_written, bytes - bytes_written);
++            bytes_written += bw;
++            maybe_unlock_mutex(stream_mutex);
++         }
++      }
++      else if (bytes_written < bytes) {
++         int silence_samples = (bytes - bytes_written) /
++            (al_get_channel_count(stream->spl.spl_data.chan_conf) *
++             al_get_audio_depth_size(stream->spl.spl_data.depth));
++         al_fill_silence(fragment + bytes_written, silence_samples,
++                         stream->spl.spl_data.depth, stream->spl.spl_data.chan_conf);
++      }
++
++      if (!al_set_audio_stream_fragment(stream, fragment)) {
++         ALLEGRO_ERROR("Error setting stream buffer.\n");
++         return;
++      }
++
++      if (bytes_written != bytes &&
++          (stream->spl.loop == _ALLEGRO_PLAYMODE_STREAM_ONCE ||
++           stream->spl.loop == _ALLEGRO_PLAYMODE_STREAM_LOOP_ONCE)) {
++         stream->is_draining = true;
++         if (!stream->feeder_finished_sent) {
++            ALLEGRO_EVENT fin_event;
++            fin_event.user.type = ALLEGRO_EVENT_AUDIO_STREAM_FINISHED;
++            fin_event.user.timestamp = al_get_time();
++            al_emit_user_event(&stream->spl.es, &fin_event, NULL);
++            stream->feeder_finished_sent = true;
++         }
++      } else {
++         stream->feeder_finished_sent = false;
++      }
++   }
++   else if (event->type == _KCM_STREAM_FEEDER_QUIT_EVENT_TYPE) {
++      ALLEGRO_EVENT fin_event;
++      stream->quit_feed_thread = true;
++      fin_event.user.type = ALLEGRO_EVENT_AUDIO_STREAM_FINISHED;
++      fin_event.user.timestamp = al_get_time();
++      al_emit_user_event(&stream->spl.es, &fin_event, NULL);
++   }
++}
++
++static void osm_pump_one(ALLEGRO_AUDIO_STREAM *stream)
++{
++   ALLEGRO_EVENT event;
++   while (stream->feed_queue && al_get_next_event(stream->feed_queue, &event))
++      osm_feed_event(stream, &event);
++}
++
++void _al_kcm_feeder_start(ALLEGRO_AUDIO_STREAM *stream)
++{
++   stream->feed_queue = al_create_event_queue();
++   al_register_event_source(stream->feed_queue, &stream->spl.es);
++   stream->quit_feed_thread = false;
++   stream->feeder_finished_sent = false;
++   if (osm_feeder_count < OSM_MAX_FEEDERS)
++      osm_feeders[osm_feeder_count++] = stream;
++}
++
++void _al_kcm_feeder_stop(ALLEGRO_AUDIO_STREAM *stream)
++{
++   int i;
++   ALLEGRO_EVENT quit_event;
++   quit_event.type = _KCM_STREAM_FEEDER_QUIT_EVENT_TYPE;
++   al_emit_user_event(&stream->spl.es, &quit_event, NULL);
++   osm_pump_one(stream);
++   for (i = 0; i < osm_feeder_count; i++) {
++      if (osm_feeders[i] == stream) {
++         memmove(osm_feeders + i, osm_feeders + i + 1, (osm_feeder_count - i - 1) * sizeof *osm_feeders);
++         osm_feeder_count--;
++         break;
++      }
++   }
++   al_destroy_event_queue(stream->feed_queue);
++   stream->feed_queue = NULL;
++}
++
++void _al_kcm_pump_streams(void)
++{
++   int i;
++   for (i = 0; i < osm_feeder_count; i++)
++      osm_pump_one(osm_feeders[i]);
++}

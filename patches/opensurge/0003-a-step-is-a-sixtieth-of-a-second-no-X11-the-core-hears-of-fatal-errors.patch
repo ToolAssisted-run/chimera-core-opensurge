@@ -1,0 +1,62 @@
+diff --git a/src/core/timer.c b/src/core/timer.c
+index e3b3d771..7f161fbf 100644
+--- a/src/core/timer.c
++++ b/src/core/timer.c
+@@ -100,6 +100,9 @@ void timer_update()
+     if(delta_time > maximum_delta)
+         delta_time = maximum_delta;
+ 
++    /* Chimera: a step is always 1/60 of a second */
++    delta_time = minimum_delta;
++
+     previous_time = current_time;
+ 
+     /* compute the smooth delta time */
+diff --git a/src/core/video.c b/src/core/video.c
+index 6fb82999..638163c3 100644
+--- a/src/core/video.c
++++ b/src/core/video.c
+@@ -26,7 +26,7 @@
+ #include <allegro5/allegro_memfile.h>
+ #include <allegro5/allegro_opengl.h>
+ 
+-#if defined(ALLEGRO_UNIX)
++#if defined(ALLEGRO_UNIX) && !defined(CHIMERA_CORE)
+ # include <allegro5/allegro_x.h>
+ #elif defined(ALLEGRO_WINDOWS)
+ # include <allegro5/allegro_windows.h>
+@@ -936,7 +936,7 @@ bool create_display(int width, int height)
+     al_set_new_display_option(ALLEGRO_DEFAULT_SHADER_PLATFORM, ALLEGRO_SHADER_GLSL_MINIMAL, ALLEGRO_REQUIRE); /* faster shader with no alpha testing */
+ #endif
+ 
+-#if defined(ALLEGRO_UNIX) && !defined(ALLEGRO_RASPBERRYPI)
++#if defined(ALLEGRO_UNIX) && !defined(ALLEGRO_RASPBERRYPI) && !defined(CHIMERA_CORE)
+     set_display_icon(NULL);
+ #endif
+ 
+@@ -1107,7 +1107,7 @@ void set_display_icon(ALLEGRO_DISPLAY* display)
+     if(display != NULL)
+         al_set_display_icon(display, icon);
+ 
+-# if defined(ALLEGRO_UNIX) && !defined(ALLEGRO_RASPBERRYPI)
++# if defined(ALLEGRO_UNIX) && !defined(ALLEGRO_RASPBERRYPI) && !defined(CHIMERA_CORE)
+     if(display == NULL)
+         al_x_set_initial_icon(icon);
+ # endif
+diff --git a/src/util/util.c b/src/util/util.c
+index 9d8b89d8..9878d3d4 100644
+--- a/src/util/util.c
++++ b/src/util/util.c
+@@ -153,6 +153,12 @@ void fatal_error(const char *fmt, ...)
+     logfile_message("%s", buf);
+     fprintf(stderr, "%s\n", buf);
+ 
++#if defined(CHIMERA_CORE)
++    /* the core is told what went wrong, and takes over at exit() */
++    extern void osurgedrv_fatal_message(const char* message);
++    osurgedrv_fatal_message(buf);
++#endif
++
+ #if defined(__ANDROID__)
+     __android_log_print(ANDROID_LOG_FATAL, GAME_UNIXNAME, "Surgexception Error: %s", buf);
+ #endif

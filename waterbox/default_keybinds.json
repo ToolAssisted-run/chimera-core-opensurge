@@ -1,0 +1,21 @@
+{
+  "_comment": [
+    "Default bindings for the Open Surge Engine's controls: the keyboard as the engine's own default map has it (the arrows, Space, Left Ctrl,",
+    "Enter, Escape and the Shift keys), and the first pad as the engine's default gamepad layout has it (A, X and Y jump; B cancels; Start and Back;",
+    "the shoulder buttons)."
+  ],
+  "AllTrollers": {
+    "Open Surge Engine": {
+      "P1 Up": "Up, J1 POV0U, X1 DpadUp, X1 LStickUp",
+      "P1 Down": "Down, J1 POV0D, X1 DpadDown, X1 LStickDown",
+      "P1 Left": "Left, J1 POV0L, X1 DpadLeft, X1 LStickLeft",
+      "P1 Right": "Right, J1 POV0R, X1 DpadRight, X1 LStickRight",
+      "P1 Fire 1": "Space, J1 B1, J1 B3, J1 B4, X1 A, X1 X, X1 Y",
+      "P1 Fire 2": "Ctrl, LeftCtrl, J1 B2, X1 B",
+      "P1 Start": "Enter, J1 B10, X1 Start",
+      "P1 Back": "Escape, J1 B9, X1 Back",
+      "P1 Left Shoulder": "Shift, J1 B5, X1 LeftShoulder",
+      "P1 Right Shoulder": "J1 B6, X1 RightShoulder"
+    }
+  }
+}
