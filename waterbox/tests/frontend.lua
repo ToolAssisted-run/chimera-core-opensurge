@@ -33,47 +33,54 @@ for line in io.lines(os.getenv("MINIHAWK_JOB")) do
 end
 meta.path = job.meta
 
-if emu.getsystemid() ~= "OpenSurge" then finish("ERROR", "wrong system id: " .. tostring(emu.getsystemid())) end
+local function body()
+	if emu.getcorename() ~= "opensurge" then finish("ERROR", "wrong core: " .. tostring(emu.getcorename())) end
 
-pcall(function() client.speedmode(6400) end)
-pcall(function() client.invisibleemulation(true) end)
+	pcall(function() client.speedmode(6400) end)
+	pcall(function() client.invisibleemulation(true) end)
 
--- to the frame count asked for, whichever frame the project opened at (a
--- project run pauses at the end of its movie, so one frame more never comes)
-local frames = tonumber(job.frames) or 100
-while emu.framecount() < frames do
-	emu.frameadvance()
+	-- to the frame count asked for, whichever frame the project opened at (a
+	-- project run pauses at the end of its movie, so one frame more never comes)
+	local frames = tonumber(job.frames) or 100
+	while emu.framecount() < frames do
+		emu.frameadvance()
+	end
+	meta.frames = emu.framecount()
+	meta.lag = emu.lagcount()
+
+	local function dump(domain, file)
+		memory.usememorydomain(domain)
+		local size = memory.getcurrentmemorydomainsize()
+		local bytes = memory.read_bytes_as_array(0, size, domain)
+		local chunks = {}
+		for i = 1, #bytes do chunks[i] = string.char(bytes[i]) end
+		writeAll(job.out .. "/" .. file, table.concat(chunks))
+		return bytes
+	end
+	dump("Game State", "gamestate.bin")
+
+	if job.save == "1" then
+		local ok, err = pcall(function() movie.save() end)
+		meta.saved = ok and "1" or tostring(err)
+	end
+
+	if game ~= nil and game.list ~= nil then
+		local ok, err = pcall(function()
+			meta.game_list = #game.list()
+			meta.game_score = game.get("Score")
+			meta.game_set = tostring(game.set("Lives", 7))
+			meta.game_lives_after_set = game.get("Lives")
+			meta.game_unknown = tostring(game.get("No Such Property"))
+		end)
+		if not ok then meta.game_error = tostring(err) end
+	else
+		meta.game_list = "absent"
+	end
+
+	finish("OK", "")
 end
-meta.frames = emu.framecount()
-meta.lag = emu.lagcount()
 
-local function dump(domain, file)
-	memory.usememorydomain(domain)
-	local size = memory.getcurrentmemorydomainsize()
-	local bytes = memory.read_bytes_as_array(0, size, domain)
-	local chunks = {}
-	for i = 1, #bytes do chunks[i] = string.char(bytes[i]) end
-	writeAll(job.out .. "/" .. file, table.concat(chunks))
-	return bytes
+local ok, err = xpcall(body, debug.traceback)
+if not ok then
+	finish("ERROR", (tostring(err):gsub("%s*\n%s*", " | ")))
 end
-dump("Game State", "gamestate.bin")
-
-if job.save == "1" then
-	local ok, err = pcall(function() movie.save() end)
-	meta.saved = ok and "1" or tostring(err)
-end
-
-if game ~= nil and game.list ~= nil then
-	local ok, err = pcall(function()
-		meta.game_list = #game.list()
-		meta.game_score = game.get("Score")
-		meta.game_set = tostring(game.set("Lives", 7))
-		meta.game_lives_after_set = game.get("Lives")
-		meta.game_unknown = tostring(game.get("No Such Property"))
-	end)
-	if not ok then meta.game_error = tostring(err) end
-else
-	meta.game_list = "absent"
-end
-
-finish("OK", "")
